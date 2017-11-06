@@ -1,0 +1,256 @@
+---
+title: "Cointegration, Correlation, and Log Returns"
+author: "Colton Smith and Eric Kammers"
+date: "Novemeber 5, 2017"
+output:
+  html_document: default
+  word_document: default
+---
+<!-- Libraries -->
+```{r message = FALSE, warning = FALSE, echo=FALSE}
+require(tseries)
+require(ggplot2)
+require(reshape2)
+require(gridExtra)
+```
+
+<!-- Functions -->
+```{r,echo=FALSE}
+calc_rets <- function(sig){
+  # calculates returns and log returns of a provided signal
+  # signal is assumed to be price
+  # faster computation than looping structure
+  sig$returns = NA; sig$log_returns = NA 
+  l = seq(length(sig$price))[2:length(sig$price)]       # sequence indices 
+  sig$log_returns[l] = log(sig$price[l]/sig$price[l-1]) # log returns
+  sig$returns[l] = sig$price[l]/sig$price[l-1]-1        # returns
+  sig = na.omit(sig)                                    # remove NA's
+}
+
+analysis <- function(top.sig, bot.sig){
+  # takes in top signal and bottom signal
+  # performs common analysis in this workspace (i.e. pearson cor, spearman cor, & p_val from ADF test)
+  
+  # p-val from ADF test
+  linmod = lm(top.sig~bot.sig)
+  adf_results = adf.test(linmod$residuals, k=1)
+  adf_p_val = adf_results$p.value
+  
+  pearson_cor = cor(top.sig, bot.sig, method = 'pearson') # pearson cor
+  spearman_cor = cor(top.sig, bot.sig, method = 'spearman') # spearman cor
+  
+  results = as.data.frame(pearson_cor); colnames(results) = 'pearson' 
+  results$spearman = spearman_cor
+  results$pval = adf_p_val
+  
+  return(results)
+}
+
+graphNtable <- function(top.sig, bot.sig, y_table, title){
+  # takes in two signals, uses previous function to produce plots with tables of useful statistics
+  # y_table is used to position the table on the graph based on the y-axis
+  
+  top.mod = calc_rets(top.sig); bot.mod = calc_rets(bot.sig) # calculate returns & log-returns
+  
+  results = round(rbind(analysis(top.mod$price,       bot.mod$price),
+                        analysis(top.mod$returns,     bot.mod$returns),
+                        analysis(top.mod$log_returns, bot.mod$log_returns)),2)
+  
+  signals = cbind(top.mod$price,bot.mod$price)
+  colnames(signals) = c('top','bot')
+  signals = melt(signals, id.vars = index)
+  
+  gg = ggplot(data = signals, aes(x = Var1, y = value, group = Var2, color = Var2, ymax = 15)) + geom_line() + 
+    ggtitle(title) + 
+    labs(x="Index",y="Value") + scale_color_manual(values=c('red','darkgreen')) + theme_bw() + 
+    theme(legend.position = 'none', plot.title = element_text(hjust = 0.5))
+  
+  table = matrix(nrow = 5, ncol = 2)
+  table[1,1] = 'ADF Test P-Value'
+  table[2,1] = 'Price Pearson Correlation'
+  table[3,1] = 'Simple Returns Pearson Correlation'
+  table[4,1] = 'Log Returns Pearson Correlation'
+  table[5,1] = 'Log Returns Spearman Correlation'
+  table[1,2] = results$pval[1]
+  table[2,2] = results$pearson[1]
+  table[3,2] = results$pearson[2]
+  table[4,2] = results$pearson[3]
+  table[5,2] = results$spearman[3]
+  table = as.table(table)
+  
+  ggtable = annotation_custom(tableGrob(table,rows=NULL,cols=NULL), xmin = 130, ymin = y_table)
+  
+  return(gg + ggtable)
+}
+
+```
+
+<!-- Pearson VS Spearman -->
+```{r,echo=FALSE, fig.align="center", fig.width=8,fig.height=4}
+# exponential curve
+X = seq(20) 
+Y = exp(seq(20))
+Y.random = rnorm(20, Y, Y)
+
+signals = as.data.frame(cbind(X,Y))
+colnames(signals) = c('X','Y')
+
+gg1 = ggplot(data = signals, aes(x = X, y = Y, ymax = 15)) + 
+  geom_line() + 
+  ggtitle('Exponential Relationship') + 
+  labs(x="Index",y="Value") + scale_color_manual(values=c('red')) + theme_bw() + 
+  theme(legend.position = 'none', plot.title = element_text(hjust = 0.5))
+
+table = matrix(nrow = 2, ncol = 2)
+table[1,1] = 'Pearson Correlation'
+table[2,1] = 'Spearman Correlation'
+table[1,2] = round(cor(X, Y, method = 'pearson'),2)
+table[2,2] = round(cor(X, Y, method = 'spearman'),2)
+table = as.table(table)
+
+ggtable1 = annotation_custom(tableGrob(table,rows=NULL,cols=NULL), xmin = -5.75, ymin = 3.5e+08)
+
+# linear curve
+X = seq(20)
+Y = (2*seq(20) + 1)
+
+signals = as.data.frame(cbind(X,Y))
+colnames(signals) = c('X','Y')
+
+gg2 = ggplot(data = signals, aes(x = X, y = Y, ymax = 15)) + 
+  geom_line() + 
+  ggtitle('Linear Relationship') + 
+  labs(x="Index",y="Value") + scale_color_manual(values=c('red')) + theme_bw() + 
+  theme(legend.position = 'none', plot.title = element_text(hjust = 0.5))
+
+table = matrix(nrow = 2, ncol = 2)
+table[1,1] = 'Pearson Correlation'
+table[2,1] = 'Spearman Correlation'
+table[1,2] = round(cor(X, Y, method = 'pearson'),2)
+table[2,2] = cor(X, Y, method = 'spearman')
+table = as.table(table)
+
+ggtable2 = annotation_custom(tableGrob(table,rows=NULL,cols=NULL), xmin = -8, ymin = 31)
+
+grid.arrange(gg1+ggtable1, gg2+ggtable2, ncol=2)
+```
+
+<!-- Returns vs Log Returns Distribution -->
+```{r, echo=FALSE, warning=FALSE, fig.align="center", fig.width=4,fig.height=4}
+index = seq(-0.5,0.5,0.01)
+lin = seq(-0.5,0.5,0.01)
+logged = log(lin+1)
+rets1 = as.data.frame(cbind(index,'linear',lin)); colnames(rets1) = c('Var1','Var2','value')
+rets2 = as.data.frame(cbind(index,'logged',logged)); colnames(rets2) = c('Var1','Var2','value')
+rets = rbind(rets1,rets2)
+rets$Var1 = as.numeric(as.character(rets$Var1))
+rets$value = as.numeric(as.character(rets$value))
+
+ggplot(data = rets, aes(x = Var1, y = value, group = Var2, color = Var2)) + geom_line(aes(linetype = Var2)) +
+  ggtitle('Simple vs Log Returns') +
+  labs(x="Simple Return",y="Log Return") + scale_color_manual(values=c('black','red')) + theme_bw() + 
+  theme(legend.position = 'none', plot.title = element_text(hjust = 0.5)) + 
+  scale_linetype_manual(values=c(3,1))
+```
+
+<!-- Perfect Correlation & Cointegration -->
+```{r, echo = FALSE}
+top = as.data.frame(sin(seq(0,50,0.25))+10); colnames(top) = 'price'
+bot = as.data.frame(sin(seq(0,50,0.25))+5); colnames(bot) = 'price'
+```
+
+```{r, echo=FALSE, warning=FALSE, fig.align="center", fig.width=10,fig.height=6}
+graphNtable(top, bot, y_table = 11.5, title = 'Perfect Cointegration, Perfect Correlation')
+```
+
+<!-- Perfect Cointegration & No Correlation -->
+```{r,echo=FALSE}
+top = as.data.frame(sin(seq(0,50,0.25))+10); colnames(top) = 'price'
+bot = as.data.frame(sin(seq(pi/2,50+(pi/2),0.25))+5); colnames(bot) = 'price'
+```
+
+```{r, echo=FALSE, warning=FALSE, fig.align="center", fig.width=10,fig.height=6}
+graphNtable(top, bot, y_table = 11.5, title = 'Perfect Cointegration, No Correlation')
+```
+
+<!-- No Cointegration & Strong Return Correlation -->
+```{r, echo=FALSE}
+top = as.data.frame(5*sin(seq(0,100,0.25))+10); colnames(top) = 'price'
+bot = as.data.frame(sin(seq(0,100,0.25))+5); colnames(bot) = 'price'
+
+top$price = top$price + (-(seq(nrow(top))-200)^2)*0.001+40 # add a parabolic curve to top
+```
+
+```{r, echo=FALSE, warning=FALSE, fig.align="center", fig.width=10,fig.height=6}
+graphNtable(top, bot, y_table = 39, title = 'No Cointegration, Strong Return Correlation')
+```
+
+<!-- Pearson vs Spearman -->
+```{r, echo= FALSE}
+top = as.data.frame(sin(seq(0,50,0.25))+10); colnames(top) = 'price'
+bot = as.data.frame(sin(seq(0,50,0.25))+5); colnames(bot) = 'price'
+
+period = 25
+anomalies = seq(period)+sample.int(length(bot$price) - period, 1) - 1 # add anomalies
+top$price[anomalies] = 0.00*top$price[anomalies] + 1
+```
+
+```{r, echo=FALSE, warning=FALSE, fig.align="center", fig.width=10,fig.height=6}
+graphNtable(top, bot, y_table = 10.75, title = 'Log, Pearson, and Spearman Comparison')
+```
+
+<!-- High Price Correlation & Low Return Correlation -->
+```{r, echo=FALSE}
+top = as.data.frame(sin(seq(0,50,0.25))+sin(5*seq(0,50,0.25))+10); colnames(top) = 'price'
+bot = as.data.frame(sin(seq(0,50,0.25))+5); colnames(bot) = 'price'
+```
+
+```{r, echo=FALSE, warning=FALSE, fig.align="center", fig.width=10,fig.height=6}
+graphNtable(top, bot, y_table = 11.5, title = 'High Price Correlation, Low Return Correlation')
+```
+
+<!-- Hist Analysis -->
+```{r,echo=FALSE}
+top = as.data.frame(sin(seq(0,50,0.25))+10); colnames(top) = 'price'
+bot = as.data.frame(sin(seq(0,50,0.25))+5); colnames(bot) = 'price'
+```
+
+```{r,echo=FALSE}
+noise = runif(length(top$price),0,1.25); top$price = top$price + noise
+```
+
+```{r, echo=FALSE, warning=FALSE, fig.align="center", fig.width=10,fig.height=4}
+top.noise = calc_rets(top); bot.nonoise = calc_rets(bot) # calculate returns & log-returns
+
+s1 = shapiro.test(top.noise$log_returns)
+gg.top = ggplot(as.data.frame(top.noise$log_returns), aes(x=top.noise$log_returns)) + 
+  geom_histogram(aes(y=..density..), colour="black", fill="white", binwidth=0.02) +
+  labs(title=paste0('Red Series, Shapiro-Wilk Test P-Value = ',round(as.numeric(s1[2]),2)),
+       x="Log-Returns", y = "Frequency") +
+  geom_density(alpha=.2, fill="#FF6666")+ 
+  theme_bw()+
+  theme(plot.title = element_text(hjust = 0.5))
+
+s2 = shapiro.test(bot.nonoise$log_returns)
+gg.bot = ggplot(as.data.frame(bot.nonoise$log_returns), aes(x=bot.nonoise$log_returns)) + 
+  geom_histogram(aes(y=..density..), colour="black", fill="white", binwidth=0.01) +
+  labs(title=paste0('Green Series, Shapiro-Wilk Test P-Value < 0.01'),
+       x="Log-Returns", y = "Frequency") +
+  geom_density(alpha=.2, fill="#FF6666")+ 
+  theme_bw()+
+  theme(plot.title = element_text(hjust = 0.5))
+
+grid.arrange(gg.top, gg.bot, ncol=2)
+```
+
+```{r, echo=FALSE, warning=FALSE, fig.align="center", fig.width=10,fig.height=6}
+graphNtable(top, bot, y_table = 11.5, title = '')
+```
+
+```{r, echo=FALSE}
+noise = runif(length(bot$price),0,1.25); bot$price = bot$price + noise
+```
+
+```{r, echo=FALSE, warning=FALSE, fig.align="center", fig.width=10,fig.height=6}
+graphNtable(top, bot, y_table = 11.5, title = '')
+```
