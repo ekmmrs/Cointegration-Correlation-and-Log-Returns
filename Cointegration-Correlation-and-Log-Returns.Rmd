@@ -46,7 +46,7 @@ analysis <- function(top.sig, bot.sig){
   return(results)
 }
 
-graphNtable <- function(top.sig, bot.sig, y_table, title){
+graphNtable <- function(top.sig, bot.sig, y_table, x_table, title){
   # takes in two signals, uses previous function to produce plots with tables of useful statistics
   # y_table is used to position the table on the graph based on the y-axis
   
@@ -78,7 +78,7 @@ graphNtable <- function(top.sig, bot.sig, y_table, title){
   table[5,2] = results$spearman[3]
   table = as.table(table)
   
-  ggtable = annotation_custom(tableGrob(table,rows=NULL,cols=NULL), xmin = 130, ymin = y_table)
+  ggtable = annotation_custom(tableGrob(table,rows=NULL,cols=NULL), xmin = x_table, ymin = y_table)
   
   return(gg + ggtable)
 }
@@ -160,7 +160,7 @@ bot = as.data.frame(sin(seq(0,50,0.25))+5); colnames(bot) = 'price'
 ```
 
 ```{r, echo=FALSE, warning=FALSE, fig.align="center", fig.width=10,fig.height=6}
-graphNtable(top, bot, y_table = 11.5, title = 'Perfect Cointegration, Perfect Correlation')
+graphNtable(top, bot, y_table = 11.5, x_table = 130, title = 'Perfect Cointegration, Perfect Correlation')
 ```
 
 <!-- Perfect Cointegration & No Correlation -->
@@ -170,7 +170,7 @@ bot = as.data.frame(sin(seq(pi/2,50+(pi/2),0.25))+5); colnames(bot) = 'price'
 ```
 
 ```{r, echo=FALSE, warning=FALSE, fig.align="center", fig.width=10,fig.height=6}
-graphNtable(top, bot, y_table = 11.5, title = 'Perfect Cointegration, No Correlation')
+graphNtable(top, bot, y_table = 11.5, x_table = 130,title = 'Perfect Cointegration, No Correlation')
 ```
 
 <!-- No Cointegration & Strong Return Correlation -->
@@ -182,7 +182,7 @@ top$price = top$price + (-(seq(nrow(top))-200)^2)*0.001+40 # add a parabolic cur
 ```
 
 ```{r, echo=FALSE, warning=FALSE, fig.align="center", fig.width=10,fig.height=6}
-graphNtable(top, bot, y_table = 39, title = 'No Cointegration, Strong Return Correlation')
+graphNtable(top, bot, y_table = 39, x_table = 260,title = 'No Cointegration, Strong Return Correlation')
 ```
 
 <!-- Pearson vs Spearman -->
@@ -196,7 +196,7 @@ top$price[anomalies] = 0.00*top$price[anomalies] + 1
 ```
 
 ```{r, echo=FALSE, warning=FALSE, fig.align="center", fig.width=10,fig.height=6}
-graphNtable(top, bot, y_table = 10.75, title = 'Log, Pearson, and Spearman Comparison')
+graphNtable(top, bot, y_table = 10.75, x_table = 130,title = 'Log, Pearson, and Spearman Comparison')
 ```
 
 <!-- High Price Correlation & Low Return Correlation -->
@@ -206,7 +206,7 @@ bot = as.data.frame(sin(seq(0,50,0.25))+5); colnames(bot) = 'price'
 ```
 
 ```{r, echo=FALSE, warning=FALSE, fig.align="center", fig.width=10,fig.height=6}
-graphNtable(top, bot, y_table = 11.5, title = 'High Price Correlation, Low Return Correlation')
+graphNtable(top, bot, y_table = 11.5, x_table = 130,title = 'High Price Correlation, Low Return Correlation')
 ```
 
 <!-- Hist Analysis -->
@@ -244,7 +244,7 @@ grid.arrange(gg.top, gg.bot, ncol=2)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, fig.align="center", fig.width=10,fig.height=6}
-graphNtable(top, bot, y_table = 11.5, title = '')
+graphNtable(top, bot, y_table = 11.5, x_table = 130,title = '')
 ```
 
 ```{r, echo=FALSE}
@@ -252,5 +252,5 @@ noise = runif(length(bot$price),0,1.25); bot$price = bot$price + noise
 ```
 
 ```{r, echo=FALSE, warning=FALSE, fig.align="center", fig.width=10,fig.height=6}
-graphNtable(top, bot, y_table = 11.5, title = '')
+graphNtable(top, bot, y_table = 11.5, x_table = 130,title = '')
 ```
